@@ -1,0 +1,72 @@
+version: "3.8"
+
+services:
+  couchdb-local:
+    image: couchdb:3.3
+    container_name: couchdb-local
+    environment:
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=password
+    ports:
+      - "5984:5984"
+    networks:
+      - marketplace-net
+
+  couchdb-central:
+    image: couchdb:3.3
+    container_name: couchdb-central
+    environment:
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=password
+    ports:
+      - "5985:5984"
+    networks:
+      - marketplace-net
+
+  backend-rust:
+    build: ./backend-rust
+    container_name: backend-rust
+    environment:
+      - SERVER_PORT=8080
+      - COUCHDB_URL=http://admin:password@couchdb-local:5984
+      - COUCHDB_USER=admin
+      - COUCHDB_PASS=password
+      - COUCHDB_DB_NAME=marketplace_pymes
+    ports:
+      - "8080:8080"
+    depends_on:
+      - couchdb-local
+    networks:
+      - marketplace-net
+
+  frontend-ts:
+    build: ./frontend-ts
+    container_name: frontend-ts
+    environment:
+      - RUST_API_URL=http://backend-rust:8080
+      - COUCHDB_LOCAL_URL=http://admin:password@couchdb-local:5984
+      - COUCHDB_REMOTE_URL=http://admin:password@couchdb-central:5984
+      - COUCHDB_DB_NAME=marketplace_pymes
+    depends_on:
+      - backend-rust
+      - couchdb-local
+      - couchdb-central
+    networks:
+      - marketplace-net
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.2
+    container_name: cadvisor
+    ports:
+      - "8082:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks:
+      - marketplace-net
+
+networks:
+  marketplace-net:
+    driver: bridge
